@@ -1,0 +1,20 @@
+{
+  "api_site": {
+    "vod360": {
+      "name": "360 资源",
+      "api": "https://360zyzz.com/api.php/provide/vod"
+    },
+    "ikun": {
+      "name": "iKun资源",
+      "api": "https://ikunzyapi.com/api.php/provide/vod"
+    },
+    "modu": {
+      "name": "魔都资源",
+      "api": "https://www.mdzyapi.com/api.php/provide/vod"
+    },
+    "baofeng": {
+      "name": "暴风资源",
+      "api": "https://bfzyapi.com/api.php/provide/vod"
+    }
+  }
+}
