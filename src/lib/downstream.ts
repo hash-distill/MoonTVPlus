@@ -151,7 +151,7 @@ export async function searchFromApi(
 
     // 使用新的缓存搜索函数处理第一页
     const firstPageResult = await searchWithCache(apiSite, query, 1, apiUrl, 8000);
-    const results = firstPageResult.results;
+    const results = [...firstPageResult.results];
     const pageCountFromFirst = firstPageResult.pageCount;
 
     const config = await getConfig();
@@ -193,6 +193,13 @@ export async function searchFromApi(
       });
     }
 
+    // This provider includes unrelated full-text hits even for nonexistent titles.
+    // Keep title matches so these results cannot suppress the TMDB alias retry.
+    if (/^https?:\/\/bfzyapi\.com(?:\/|$)/i.test(apiBaseUrl)) {
+      const normalize = (text: string) => text.normalize('NFKC').toLowerCase().replace(/\s+/g, '');
+      const needle = normalize(query);
+      return results.filter(item => normalize(item.title).includes(needle));
+    }
     return results;
   } catch (error) {
     return [];

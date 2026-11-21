@@ -214,7 +214,7 @@ export const UserMenu: React.FC = () => {
     isDoubanImageProxyBackupDropdownOpen,
     setIsDoubanImageProxyBackupDropdownOpen,
   ] = useState(false);
-  const [bufferStrategy, setBufferStrategy] = useState('medium');
+  const [bufferStrategy, setBufferStrategy] = useState('high');
   const [nextEpisodePreCache, setNextEpisodePreCache] = useState(true);
   const [nextEpisodeDanmakuPreload, setNextEpisodeDanmakuPreload] =
     useState(true);
@@ -379,7 +379,7 @@ export const UserMenu: React.FC = () => {
   // 缓冲策略选项
   const bufferStrategyOptions = [
     { value: 'low', label: '低缓冲（省流量）' },
-    { value: 'medium', label: '中缓冲（推荐）' },
+    { value: 'medium', label: '中缓冲（均衡）' },
     { value: 'high', label: '高缓冲（流畅播放）' },
     { value: 'ultra', label: '超高缓冲（极速体验）' },
   ];
@@ -2266,7 +2266,7 @@ export const UserMenu: React.FC = () => {
     setDoubanImageProxyTypeBackup('server');
     setDoubanImageProxyUrlBackup('');
     setTmdbImageBaseUrl('https://image.tmdb.org');
-    setBufferStrategy('medium');
+    setBufferStrategy('high');
     setNextEpisodePreCache(true);
     setNextEpisodeDanmakuPreload(true);
     setDisablePlaybackThumbnail(true);
@@ -2307,7 +2307,7 @@ export const UserMenu: React.FC = () => {
       localStorage.setItem('doubanImageProxyTypeBackup', 'server');
       localStorage.setItem('doubanImageProxyUrlBackup', '');
       localStorage.setItem('tmdbImageBaseUrl', 'https://image.tmdb.org');
-      localStorage.setItem('bufferStrategy', 'medium');
+      localStorage.setItem('bufferStrategy', 'high');
       localStorage.setItem('nextEpisodePreCache', 'true');
       localStorage.setItem('nextEpisodeDanmakuPreload', 'true');
       localStorage.setItem('disablePlaybackThumbnail', 'true');
@@ -2493,7 +2493,7 @@ export const UserMenu: React.FC = () => {
         );
         break;
       case 'bufferStrategy':
-        setBufferStrategy('medium');
+        setBufferStrategy('high');
         break;
       case 'nextEpisodePreCache':
         setNextEpisodePreCache(true);

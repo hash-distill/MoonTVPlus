@@ -7702,8 +7702,8 @@ function PlayPageClient() {
 
               // 从localStorage读取缓冲策略
               const bufferStrategy = typeof window !== 'undefined'
-                ? localStorage.getItem('bufferStrategy') || 'medium'
-                : 'medium';
+                ? localStorage.getItem('bufferStrategy') || 'high'
+                : 'high';
 
               // 根据缓冲策略配置不同的缓冲参数
               const getBufferConfig = (strategy: string) => {
