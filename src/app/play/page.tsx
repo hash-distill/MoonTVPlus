@@ -89,6 +89,7 @@ import {
   recommendationCacheKeys,
   setRecommendationCache,
 } from '@/lib/recommendations/cache';
+import { usePlaybackFailover } from '@/hooks/usePlaybackFailover';
 import { isPageReadCancelled, pageReadSignal } from '@/lib/page-read.client';
 import { getIndexedDBVideoPlaybackUrl } from '@/lib/indexeddb-video-cache';
 import {
@@ -5926,12 +5927,16 @@ function PlayPageClient() {
     );
   };
 
+  const sourceSwitchBusy = useRef(false);
+  const routeMeasurements = useRef<ReadonlyMap<string, { hasError?: boolean }>>(new Map());
   // 处理换源
   const handleSourceChange = async (
     newSource: string,
     newId: string,
-    newTitle: string
+    newTitle: string,
+    recoveryTime?: number
   ) => {
+    sourceSwitchBusy.current = true;
     try {
       // 标记正在换源，防止 title 变化触发页面刷新
       isSourceChangingRef.current = true;
@@ -5948,7 +5953,7 @@ function PlayPageClient() {
       console.log('换源前当前播放时间:', currentPlayTime);
 
       // 清除并设置下一个跳过片头片尾配置
-      if (currentSourceRef.current && currentIdRef.current) {
+      if (recoveryTime === undefined && currentSourceRef.current && currentIdRef.current) {
         try {
           await deleteSkipConfig(
             currentSourceRef.current,
@@ -6026,12 +6031,13 @@ function PlayPageClient() {
       }
 
       const isSameEpisodeSwitch = targetIndex === previousEpisodeIndex;
-      const resumeTime = isSameEpisodeSwitch
+      const resumeTime = recoveryTime ?? (isSameEpisodeSwitch
         ? await getSourceSwitchResumeTime(previousEpisodeIndex, currentPlayTime)
         : loadLocalEpisodeProgress(
             newEpisodeProgressContentKey,
             targetIndex
-          );
+          ));
+      if (recoveryTime !== undefined) resumePlayingAfterHlsModeSwitchRef.current = true;
       resumeTimeRef.current = resumeTime;
 
       // 更新URL参数（不刷新页面）
@@ -6071,7 +6077,7 @@ function PlayPageClient() {
       setCorrectedDesc(finalDesc);
       setVideoDoubanId(newDetail.douban_id || 0);
 
-      if (isSameEpisodeSwitch && resumeTime && resumeTime > 1) {
+      if (recoveryTime === undefined && isSameEpisodeSwitch && resumeTime && resumeTime > 1) {
         const currentDuration = artPlayerRef.current?.duration || 0;
         saveLocalEpisodeProgress(
           newEpisodeProgressContentKey,
@@ -6120,8 +6126,28 @@ function PlayPageClient() {
       // 隐藏换源加载状态
       setIsVideoLoading(false);
       setError(err instanceof Error ? err.message : '换源失败');
+    } finally {
+      sourceSwitchBusy.current = false;
     }
   };
+
+  const resetFailover = usePlaybackFailover({
+    current: detail,
+    episode: currentEpisodeIndex,
+    sources: availableSources.filter(s => !isNetdiskMountSource(s.source) && !isLazyDetailSource(s.source)),
+    disabled: loading || !!watchRoomContext?.currentRoom ||
+      !!error || isDirectPlay || isNetdiskMountSource(currentSource) || isLazyDetailSource(currentSource),
+    fatal: !!videoError,
+    video: () => sourceSwitchBusy.current ? undefined : artPlayerRef.current?.video,
+    rank: s => {
+      const key = `${s.source}-${s.id}`;
+      const test = routeMeasurements.current.get(key);
+      if (test?.hasError) return -2;
+      return test || precomputedVideoInfo.has(key) ? 1 : 0;
+    },
+    switchTo: (s, time) => { void handleSourceChange(s.source, s.id, s.title, time); },
+    notify: message => setToast({ message, type: 'info', onClose: () => setToast(null) }),
+  });
 
   useEffect(() => {
     document.addEventListener('keydown', handleKeyboardShortcuts);
@@ -10908,6 +10934,7 @@ function PlayPageClient() {
                               onClick={() => {
                                 setVideoError(null);
                                 setIsVideoLoading(true);
+                                resetFailover();
                                 // 重新加载视频
                                 if (artPlayerRef.current) {
                                   artPlayerRef.current.url = videoUrl;
@@ -11636,7 +11663,11 @@ function PlayPageClient() {
                 richEpisodeNames={richEpisodeNames}
                 value={currentEpisodeIndex + 1}
                 onChange={playSync.shouldDisableControls ? () => { /* disabled */ } : handleEpisodeChange}
-                onSourceChange={playSync.shouldDisableControls ? () => { /* disabled */ } : handleSourceChange}
+                onMeasurements={map => { routeMeasurements.current = map; }}
+                onSourceChange={playSync.shouldDisableControls ? () => { /* disabled */ } : (source, id, title) => {
+                  resetFailover();
+                  void handleSourceChange(source, id, title);
+                }}
                 isRoomMember={playSync.shouldDisableControls}
                 currentSource={currentSource}
                 currentId={currentId}

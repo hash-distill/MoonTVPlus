@@ -280,6 +280,7 @@ interface EpisodeSelectorProps {
   backgroundSourcesLoading?: boolean;
   /** 预计算的测速结果，避免重复测速 */
   precomputedVideoInfo?: Map<string, VideoInfo>;
+  onMeasurements?: (info: ReadonlyMap<string, VideoInfo>) => void;
   /** 弹幕相关 */
   onDanmakuSelect?: (selection: DanmakuSelection) => void;
   currentDanmakuSelection?: DanmakuSelection | null;
@@ -316,6 +317,7 @@ const EpisodeSelector: React.FC<EpisodeSelectorProps> = ({
   sourceSearchError = null,
   backgroundSourcesLoading = false,
   precomputedVideoInfo,
+  onMeasurements,
   onDanmakuSelect,
   currentDanmakuSelection,
   onUploadDanmaku,
@@ -515,6 +517,7 @@ const EpisodeSelector: React.FC<EpisodeSelectorProps> = ({
 
   useEffect(() => {
     videoInfoMapRef.current = videoInfoMap;
+    onMeasurements?.(videoInfoMap);
   }, [videoInfoMap]);
 
   useEffect(() => {
