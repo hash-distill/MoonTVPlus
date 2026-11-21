@@ -3,6 +3,8 @@ compatibility_date = "2024-09-23"
 compatibility_flags = ["nodejs_compat"]
 main = "./cloudflare-worker.ts"
 minify = true
+# next-themes 会将函数序列化为浏览器内联脚本，须避免注入仅存在于 Worker 的函数名辅助代码。
+keep_names = false
 
 # 静态资源配置
 # Cloudflare Workers Assets 用于服务静态文件
