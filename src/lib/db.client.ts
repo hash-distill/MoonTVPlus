@@ -657,6 +657,7 @@ async function handleDatabaseOperationFailure(
       );
     });
   } catch (refreshErr) {
+    if (isPageReadCancelled(refreshErr)) return;
     console.error(`刷新${dataType}缓存失败:`, refreshErr);
     triggerGlobalError(`刷新${dataType}缓存失败`);
   }
@@ -1366,12 +1367,15 @@ export async function addSearchHistory(keyword: string): Promise<void> {
 
     // 异步同步到数据库
     try {
+      const body = JSON.stringify({ keyword: trimmed });
       await fetchWithAuth('/api/searchhistory', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ keyword: trimmed }),
+        body,
+        // Allow short history writes to finish if the results page is immediately refreshed.
+        keepalive: new Blob([body]).size <= 64 * 1024,
       });
     } catch (err) {
       await handleDatabaseOperationFailure('searchHistory', err);

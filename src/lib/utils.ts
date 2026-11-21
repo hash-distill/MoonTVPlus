@@ -539,6 +539,12 @@ export function processImageUrl(originalUrl: string): string {
     return originalUrl;
   }
 
+  // This poster host serves images on a nonstandard port that some clients cannot reach.
+  if (/^https?:\/\/www\.imgzy360\.com:7788\/upload\//i.test(originalUrl)) {
+    const httpsUrl = originalUrl.replace(/^http:/i, 'https:');
+    return `/api/image-proxy?url=${encodeURIComponent(httpsUrl)}`;
+  }
+
   // 处理 TMDB 图片 URL 替换
   if (originalUrl.includes('image.tmdb.org')) {
     if (typeof window !== 'undefined') {
@@ -567,7 +573,7 @@ export function processImageUrl(originalUrl: string): string {
 
   // 处理 Bangumi 图片代理。直连模式尊重用户选择，不代理图片；
   // 仅在服务器代理 / 自定义 Base URL 模式下使用本站图片代理。
-  // sticky 降级中走备源；否则用主源，并非阻塞探测主源图片域主页（5s，404 算通）。
+  // sticky 降级中走备源；否则用主源，并在后台探测实际海报地址。
   if (isBangumiImageUrl(originalUrl)) {
     const primary = getPrimaryBangumiImageSource();
     const backup = getBackupBangumiImageSource(primary);
