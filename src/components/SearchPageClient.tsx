@@ -51,6 +51,7 @@ import ProxyImage from '@/components/ProxyImage';
 import SearchResultFilter, {
   SearchFilterCategory,
 } from '@/components/SearchResultFilter';
+import SearchQuality from '@/components/SearchQuality';
 import SearchSuggestions from '@/components/SearchSuggestions';
 import VideoCard, { VideoCardHandle } from '@/components/VideoCard';
 import VirtualScrollableGrid from '@/components/VirtualScrollableGrid';
@@ -166,7 +167,7 @@ export function SearchPageClient({ searchBase = '/search' }: { searchBase?: stri
       if (!cached) return null;
 
       const parsed = JSON.parse(cached) as SearchCachePayload;
-      if (parsed?.status === 'complete' && Array.isArray(parsed.results)) {
+      if (parsed?.status === 'complete' && Array.isArray(parsed.results) && parsed.results.length > 0) {
         return parsed.results;
       }
     } catch (error) {
@@ -907,6 +908,7 @@ export function SearchPageClient({ searchBase = '/search' }: { searchBase?: stri
   );
 
   const renderListItem = (item: {
+    qualitySource: SearchResult;
     key: string;
     title: string;
     poster: string;
@@ -987,6 +989,7 @@ export function SearchPageClient({ searchBase = '/search' }: { searchBase?: stri
                     item.type === 'movie' ? '电影' : '剧集',
                     'bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-300'
                   )}
+                  <SearchQuality source={item.qualitySource} />
                   {yearText &&
                     renderTag(
                       yearText,
@@ -1378,7 +1381,7 @@ export function SearchPageClient({ searchBase = '/search' }: { searchBase?: stri
                 setCompletedSources(0);
                 break;
               case 'source_result': {
-                setCompletedSources((prev) => prev + 1);
+                if (!payload.aliasRetry) setCompletedSources((prev) => prev + 1);
                 if (
                   Array.isArray(payload.results) &&
                   payload.results.length > 0
@@ -2328,6 +2331,7 @@ export function SearchPageClient({ searchBase = '/search' }: { searchBase?: stri
 
                               if (resultDisplayMode === 'list') {
                                 return renderListItem({
+                                  qualitySource: group[0],
                                   key: `agg-${mapKey}`,
                                   title,
                                   poster,
@@ -2376,6 +2380,7 @@ export function SearchPageClient({ searchBase = '/search' }: { searchBase?: stri
                                       group.find((g) => g.class)?.class
                                     }
                                   />
+                                  <SearchQuality source={group[0]} />
                                 </div>
                               );
                             })
@@ -2389,6 +2394,7 @@ export function SearchPageClient({ searchBase = '/search' }: { searchBase?: stri
 
                               if (resultDisplayMode === 'list') {
                                 return renderListItem({
+                                  qualitySource: item,
                                   key: `all-${item.source}-${item.id}`,
                                   id: item.id,
                                   title: item.title,
@@ -2435,6 +2441,7 @@ export function SearchPageClient({ searchBase = '/search' }: { searchBase?: stri
                                     isAnime={itemIsAnime}
                                     typeName={item.type_name || item.class}
                                   />
+                                  <SearchQuality source={item} />
                                 </div>
                               );
                             });

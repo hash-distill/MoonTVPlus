@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 import { getAuthInfoFromCookie } from '@/lib/auth';
 import { getAvailableApiSites, getCacheTime, getConfig } from '@/lib/config';
+import { searchChineseAlias } from '@/lib/search-alias';
 import { searchFromApi } from '@/lib/downstream';
 import { getProxyToken } from '@/lib/emby-token';
 import { hasFeaturePermission } from '@/lib/permissions';
@@ -279,6 +280,11 @@ export async function GET(request: NextRequest) {
         const typeName = result.type_name || '';
         return !yellowWords.some((word: string) => typeName.includes(word));
       });
+    }
+
+    if (!flattenedResults.length) {
+      const groups = await searchChineseAlias(query, apiSites, config);
+      flattenedResults = groups.flatMap(group => group.results);
     }
 
     // 按权重降序排序

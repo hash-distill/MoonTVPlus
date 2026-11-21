@@ -671,10 +671,13 @@ const EpisodeSelector: React.FC<EpisodeSelectorProps> = ({
     if (!source.episodes || source.episodes.length === 0) {
       return;
     }
-    const episodeUrl =
-      source.episodes.length > 1 ? source.episodes[1] : source.episodes[0];
+    const rawUrl = source.episodes[0];
+    const episodeUrl = source.proxyMode && /\.m3u8(?:[?#]|$)/i.test(rawUrl)
+      ? '/api/proxy/vod/m3u8?source=' + encodeURIComponent(source.source) + '&url=' + encodeURIComponent(rawUrl)
+      : rawUrl;
 
     // 标记为已尝试
+    attemptedSourcesRef.current.add(sourceKey);
     setAttemptedSources((prev) => new Set(prev).add(sourceKey));
 
     try {
@@ -1353,6 +1356,9 @@ const EpisodeSelector: React.FC<EpisodeSelectorProps> = ({
               <div className='flex-1 overflow-y-auto space-y-2 pb-20'>
                 {[...availableSources]
                   .sort((a, b) => {
+                    const aFailed = videoInfoMap.get(`${a.source}-${a.id}`)?.hasError === true;
+                    const bFailed = videoInfoMap.get(`${b.source}-${b.id}`)?.hasError === true;
+                    if (aFailed !== bFailed) return Number(aFailed) - Number(bFailed);
                     const aIsCurrent =
                       a.source?.toString() === currentSource?.toString() &&
                       a.id?.toString() === currentId?.toString();
@@ -1478,7 +1484,7 @@ const EpisodeSelector: React.FC<EpisodeSelectorProps> = ({
                            ? 'border-yellow-500'
                                 : 'border-gray-500/60'
                       }`}>
-                              {source.source_name}
+                              {source.source_name}{source.year && source.year !== 'unknown' ? ' · ' + source.year : ''}
                             </span>
                             {source.episodes.length > 1 && (
                               <span className={`text-xs ${faintTextClass} font-medium`}>

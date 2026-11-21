@@ -3333,10 +3333,7 @@ function PlayPageClient() {
           return null;
         }
 
-        let episodeUrl =
-          source.episodes.length > 1
-            ? source.episodes[1]
-            : source.episodes[0];
+        let episodeUrl = source.episodes[0];
 
         const isM3u8 = episodeUrl.toLowerCase().includes('.m3u') || !episodeUrl.toLowerCase().match(/\.(mp4|flv|webm|mkv|avi|mov)(\?.*)?$/);
         if (source.source === 'directplay' && isM3u8) {
@@ -3492,7 +3489,7 @@ function PlayPageClient() {
         case 'SD':
           return 20;
         default:
-          return 0;
+          return /^\d+p$/.test(testResult.quality) ? Math.min(100, 75 * parseInt(testResult.quality, 10) / 1080) : 0;
       }
     })();
     score += qualityScore * dimensionWeights.quality;
@@ -5377,22 +5374,27 @@ function PlayPageClient() {
       }
     };
 
-    const filterSourcesForCurrentVideo = (items: SearchResult[]): SearchResult[] => {
-      return items.filter(
-        (result: SearchResult) =>
-          normalizeTitle(result.title).toLowerCase() ===
-          normalizeTitle(videoTitleRef.current).toLowerCase() &&
-          (videoYearRef.current
-            ? result.year.toLowerCase() === videoYearRef.current.toLowerCase() ||
-              !result.year ||
-              result.year.trim() === '' ||
-              result.year === 'unknown' ||
-              !/^\d{4}$/.test(result.year)
-            : true) &&
-          (searchType
-            ? getType(result) === searchType
-            : true)
-      );
+    let verifiedMovieYear: Promise<string> | undefined;
+    const filterSourcesForCurrentVideo = async (items: SearchResult[]): Promise<SearchResult[]> => {
+      const title = videoTitleRef.current;
+      const sameTitle = (other: string) => normalizeTitle(other).toLowerCase() === normalizeTitle(title).toLowerCase();
+      const candidates = items.filter(item => sameTitle(item.title) && (!searchType || getType(item) === searchType));
+      const expected = videoYearRef.current;
+      const years = new Set(candidates.map(s => s.year).filter(year => /^\d{4}$/.test(year)));
+      if (expected && /^\d{4}$/.test(expected)) years.add(expected);
+      if (years.size > 1 && candidates.length && candidates.every(item => getType(item) === 'movie')) {
+        // 同名翻拍保留原年份。只有 TMDB 精确片名唯一且年份有源佐证时才合并。
+        verifiedMovieYear ??= fetch('/api/tmdb/search?query=' + encodeURIComponent(title), { signal: AbortSignal.timeout(5000) })
+          .then(async response => {
+            if (!response.ok) return '';
+            const data = await response.json();
+            const exact = data.results?.filter((m: {media_type: string; title?: string}) => m.media_type === 'movie' && sameTitle(m.title || ''));
+            return exact?.length === 1 ? String(exact[0].release_date || '').slice(0, 4) : '';
+          }).catch(() => '');
+        const year = await verifiedMovieYear;
+        if (year && years.has(year)) return candidates.map(item => ({ ...item, year }));
+      }
+      return candidates.filter(item => !expected || !/^\d{4}$/.test(item.year || '') || item.year === expected);
     };
 
     const fetchSourcesData = async (query: string): Promise<SearchResult[]> => {
@@ -5408,7 +5410,7 @@ function PlayPageClient() {
           console.log(`[Play] 使用 sessionStorage ${cachedPayload.status === 'partial' ? '临时' : '完整'}缓存的搜索结果`);
           setFallbackRecommendations(buildFallbackRecommendations(cachedPayload.results, query));
 
-          const cachedResults = filterSourcesForCurrentVideo(cachedPayload.results);
+          const cachedResults = await filterSourcesForCurrentVideo(cachedPayload.results);
           fallbackCachedResults = cachedResults;
           setAvailableSources(applyCorrectionsToSources(cachedResults));
 
@@ -5432,7 +5434,7 @@ function PlayPageClient() {
         setHasCompletedSearchRequest(true);
         setFallbackRecommendations(buildFallbackRecommendations(allResults, query));
 
-        const results = filterSourcesForCurrentVideo(allResults);
+        const results = await filterSourcesForCurrentVideo(allResults);
         setAvailableSources(applyCorrectionsToSources(results));
         return results;
       } catch (err) {
@@ -5447,14 +5449,14 @@ function PlayPageClient() {
       }
     };
 
-    const getCachedSourcesData = (query: string): SearchResult[] => {
+    const getCachedSourcesData = async (query: string): Promise<SearchResult[]> => {
       const cachedPayload = readSearchCache(query);
       if (!cachedPayload) {
         return [];
       }
 
       return applyCorrectionsToSources(
-        filterSourcesForCurrentVideo(cachedPayload.results)
+        await filterSourcesForCurrentVideo(cachedPayload.results)
       );
     };
 
@@ -5544,7 +5546,7 @@ function PlayPageClient() {
       let sourcesInfo: SearchResult[] = [];
 
       if (currentSource && currentId) {
-        const cachedSources = getCachedSourcesData(searchTitle || videoTitle);
+        const cachedSources = await getCachedSourcesData(searchTitle || videoTitle);
         const cachedTarget = cachedSources.find(
           (source) => source.source === currentSource && source.id === currentId
         );
@@ -5587,6 +5589,12 @@ function PlayPageClient() {
               mergedSources.set(key, source);
             }
           });
+          for (const source of sources) {
+            const existing = mergedSources.get(`${source.source}-${source.id}`);
+            if (existing && existing.year !== source.year) {
+              mergedSources.set(`${source.source}-${source.id}`, { ...existing, year: source.year });
+            }
+          }
           setAvailableSources(
             applyCorrectionsToSources(Array.from(mergedSources.values()))
           );

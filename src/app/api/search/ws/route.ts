@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 import { getAuthInfoFromCookie } from '@/lib/auth';
 import { getAvailableApiSites, getConfig } from '@/lib/config';
+import { searchChineseAlias } from '@/lib/search-alias';
 import { searchFromApi } from '@/lib/downstream';
 import { hasFeaturePermission } from '@/lib/permissions';
 import { yellowWords } from '@/lib/yellow';
@@ -139,8 +140,18 @@ export async function GET(request: NextRequest) {
       let completedSources = 0;
       const allResults: any[] = [];
 
-      const maybeComplete = () => {
-        if (completedSources !== totalSourceCount || streamClosed) return;
+      let finishing = false;
+      const maybeComplete = async () => {
+        if (completedSources !== totalSourceCount || streamClosed || finishing) return;
+        finishing = true;
+        if (!allResults.length && !request.signal.aborted) {
+          const groups = await searchChineseAlias(query, sortedApiSites, config).catch(() => []);
+          for (const group of groups) {
+            if (!group.results.length || streamClosed) continue;
+            allResults.push(...group.results);
+            safeEnqueue(encoder.encode(`data: ${JSON.stringify({ type: 'source_result', aliasRetry: true, ...group })}\n\n`));
+          }
+        }
         const completeEvent = `data: ${JSON.stringify({
           type: 'complete',
           totalResults: allResults.length,
@@ -159,7 +170,7 @@ export async function GET(request: NextRequest) {
       };
 
       if (totalSourceCount === 0) {
-        maybeComplete();
+        void maybeComplete();
         return;
       }
 
@@ -225,7 +236,7 @@ export async function GET(request: NextRequest) {
                     streamClosed = true;
                   }
                 }
-                maybeComplete();
+                void maybeComplete();
 
                 return results;
               } catch (error) {
@@ -245,7 +256,7 @@ export async function GET(request: NextRequest) {
                   })}\n\n`;
                   safeEnqueue(encoder.encode(sourceEvent));
                 }
-                maybeComplete();
+                void maybeComplete();
                 return [];
               }
             });
@@ -267,7 +278,7 @@ export async function GET(request: NextRequest) {
                 })}\n\n`;
                 safeEnqueue(encoder.encode(sourceEvent));
               }
-              maybeComplete();
+              void maybeComplete();
             }
           }
         })();
@@ -346,7 +357,7 @@ export async function GET(request: NextRequest) {
                 allResults.push(...safeResults);
               }
             }
-            maybeComplete();
+            void maybeComplete();
           })
           .catch((error) => {
             console.error('[Search WS] 搜索 OpenList 超时:', error);
@@ -361,7 +372,7 @@ export async function GET(request: NextRequest) {
               })}\n\n`;
               safeEnqueue(encoder.encode(sourceEvent));
             }
-            maybeComplete();
+            void maybeComplete();
           });
       }
 
@@ -440,27 +451,7 @@ export async function GET(request: NextRequest) {
         }
 
         // 检查是否所有源都已完成
-        if (completedSources === totalSourceCount) {
-          if (!streamClosed) {
-            // 发送最终完成事件
-            const completeEvent = `data: ${JSON.stringify({
-              type: 'complete',
-              totalResults: allResults.length,
-              completedSources,
-              timestamp: Date.now()
-            })}\n\n`;
-
-            if (safeEnqueue(encoder.encode(completeEvent))) {
-              // 只有在成功发送完成事件后才关闭流
-              streamClosed = true;
-              try {
-                controller.close();
-              } catch (error) {
-                console.warn('Failed to close controller:', error);
-              }
-            }
-          }
-        }
+        void maybeComplete();
       });
 
       const scriptPromises = enabledScripts.map(async (script) => {
@@ -553,25 +544,7 @@ export async function GET(request: NextRequest) {
           }
         }
 
-        if (completedSources === totalSourceCount) {
-          if (!streamClosed) {
-            const completeEvent = `data: ${JSON.stringify({
-              type: 'complete',
-              totalResults: allResults.length,
-              completedSources,
-              timestamp: Date.now()
-            })}\n\n`;
-
-            if (safeEnqueue(encoder.encode(completeEvent))) {
-              streamClosed = true;
-              try {
-                controller.close();
-              } catch (error) {
-                console.warn('Failed to close controller:', error);
-              }
-            }
-          }
-        }
+        void maybeComplete();
       });
 
       // 等待所有搜索完成
