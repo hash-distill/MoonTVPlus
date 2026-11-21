@@ -89,6 +89,7 @@ import {
   recommendationCacheKeys,
   setRecommendationCache,
 } from '@/lib/recommendations/cache';
+import { isPageReadCancelled, pageReadSignal } from '@/lib/page-read.client';
 import { getIndexedDBVideoPlaybackUrl } from '@/lib/indexeddb-video-cache';
 import {
   convertSubtitleFileToVttObjectUrl,
@@ -1628,7 +1629,7 @@ function PlayPageClient() {
           ? `/api/tmdb-details?cachedId=${encodeURIComponent(cachedId)}`
           : `/api/tmdb-details?title=${encodeURIComponent(videoTitle)}`;
 
-        const response = await fetch(url);
+        const response = await fetch(url, { signal: pageReadSignal() });
 
         if (!response.ok) {
           setTmdbBackdrop(null);
@@ -1663,6 +1664,7 @@ function PlayPageClient() {
           }
         }
       } catch (error) {
+        if (isPageReadCancelled(error)) return;
         console.error('获取TMDB背景图失败:', error);
         setTmdbBackdrop(null);
       }
@@ -2407,8 +2409,6 @@ function PlayPageClient() {
   // 当前源的视频信息（用于标题旁边显示）
   const [currentSourceVideoInfo, setCurrentSourceVideoInfo] = useState<{
     quality: string;
-    loadSpeed: string;
-    pingTime: number;
     bitrate: string;
   } | null>(null);
 
@@ -3180,54 +3180,21 @@ function PlayPageClient() {
     return 'unknown';
   };
 
-  // 获取当前源的视频信息（分辨率和码率）
-  const fetchCurrentSourceVideoInfo = async () => {
-    if (!detail || !detail.episodes || detail.episodes.length === 0) {
-      return;
-    }
-
-    // 获取当前集数的播放地址
-    let episodeUrl = detail.episodes[currentEpisodeIndex];
-    if (!episodeUrl) {
-      return;
-    }
-
-    // openlist 的 lazy 播放地址或已确认的单文件直链（如 mkv），解析前无法探测分辨率（内部 hls.js XHR 还会触发 CORS 误报），跳过
-    if (
-      episodeUrl.startsWith('/api/openlist/play') ||
-      videoMediaTypeRef.current === 'file'
-    ) {
+  // 从正在播放的视频读取元数据，避免为了悬浮提示再下载一份播放流。
+  const updateCurrentSourceVideoInfo = () => {
+    const video: HTMLVideoElement | undefined = artPlayerRef.current?.video;
+    if (!video?.videoHeight) {
       setCurrentSourceVideoInfo(null);
       return;
     }
 
-    // 简单的正则或者后缀判断，如果明确不是 m3u8 (比如 mp4)，则不走 m3u8 代理
-    const isM3u8 = episodeUrl.toLowerCase().includes('.m3u') || !episodeUrl.toLowerCase().match(/\.(mp4|flv|webm|mkv|avi|mov)(\?.*)?$/);
-
-    if (currentSource === 'directplay' && isM3u8) {
-      // 仅当 localStorage 记忆了该域名需要代理时才走代理
-      if (isDirectplayDomainProxied(episodeUrl)) {
-        const tokenParam = proxyToken ? `&token=${encodeURIComponent(proxyToken)}` : '';
-        episodeUrl = `/api/proxy-m3u8?url=${encodeURIComponent(episodeUrl)}&source=directplay${tokenParam}`;
-      } else {
-        // 直链模式且未走代理：跳过 HLS.js 探测。
-        // getVideoResolutionFromM3u8 内部使用 HLS.js (XMLHttpRequest) 加载，
-        // 而 XHR 受 CORS 限制，探测必然失败。实际播放器通过 <video src> 加载不受 CORS 影响。
-        console.log('[视频信息] 直链直连模式，跳过分辨率探测（避免 CORS 误报）');
-        setCurrentSourceVideoInfo(null);
-        return;
-      }
-    } else if (sourceProxyMode && isM3u8) {
-      episodeUrl = `/api/proxy/vod/m3u8?url=${encodeURIComponent(episodeUrl)}&source=${encodeURIComponent(currentSource)}`;
-    }
-
-    try {
-      const info = await getVideoResolutionFromM3u8(episodeUrl, 4000);
-      setCurrentSourceVideoInfo(info);
-    } catch (error) {
-      console.error('获取视频信息失败:', error);
-      setCurrentSourceVideoInfo(null);
-    }
+    const level = video.hls?.levels?.[video.hls.currentLevel];
+    const bitrate = level?.realBitrate || level?.bitrate;
+    const height = video.videoHeight;
+    setCurrentSourceVideoInfo({
+      quality: height === 2160 ? '4K' : height === 1440 ? '2K' : `${height}p`,
+      bitrate: bitrate > 0 ? `${(bitrate / 1_000_000).toFixed(2)} Mbps` : '未知',
+    });
   };
 
   // 播放源优选函数
@@ -5177,7 +5144,7 @@ function PlayPageClient() {
         if (fileNameParam) {
           url += `&fileName=${encodeURIComponent(fileNameParam)}`;
         }
-        const detailResponse = await fetch(url);
+        const detailResponse = await fetch(url, { signal: pageReadSignal() });
         if (!detailResponse.ok) {
           throw new Error('获取视频详情失败');
         }
@@ -5186,6 +5153,7 @@ function PlayPageClient() {
         setAvailableSources(sourcesWithCorrections);
         return sourcesWithCorrections;
       } catch (err) {
+        if (isPageReadCancelled(err)) return [];
         console.error('获取视频详情失败:', err);
         return [];
       } finally {
@@ -5567,6 +5535,7 @@ function PlayPageClient() {
               searchTitle || videoTitle,
               currentSource === 'xiaoya' ? fileName : undefined
             );
+            if (pageReadSignal()?.aborted) return;
             if (currentSourceDetail.length > 0) {
               detailData = currentSourceDetail[0];
               sourcesInfo = currentSourceDetail;
@@ -5898,13 +5867,6 @@ function PlayPageClient() {
       }
     }
   }, [searchParams, currentSource, currentId, availableSources, currentEpisodeIndex]);
-
-  // 监听 detail 和 currentEpisodeIndex 变化，自动获取视频信息
-  useEffect(() => {
-    if (detail && detail.episodes && detail.episodes.length > 0) {
-      fetchCurrentSourceVideoInfo();
-    }
-  }, [detail, currentEpisodeIndex]);
 
   // 监听 detail 和 currentEpisodeIndex 变化，动态更新字幕
   useEffect(() => {
@@ -9251,6 +9213,8 @@ function PlayPageClient() {
           persistPlaybackRate(currentRate);
           syncPlaybackPitch();
         });
+        artPlayerRef.current.on('video:emptied', () => setCurrentSourceVideoInfo(null));
+        artPlayerRef.current.on('video:loadedmetadata', updateCurrentSourceVideoInfo);
         artPlayerRef.current.on('video:playing', () => {
           if (
             isWebkit &&
@@ -11866,7 +11830,8 @@ function PlayPageClient() {
                       <span
                         className={`relative group cursor-pointer border px-2 py-[1px] rounded ${detail.source === 'xiaoya' ? 'border-blue-500' : isNetdiskSource(detail.source) ? 'border-purple-500' : detail.source === 'openlist' || detail.source === 'emby' || detail.source?.startsWith('emby_') ? 'border-yellow-500' : 'border-gray-500/60'
                           }`}
-                        onClick={fetchCurrentSourceVideoInfo}
+                        onMouseEnter={updateCurrentSourceVideoInfo}
+                        onClick={updateCurrentSourceVideoInfo}
                       >
                         {detail.source_name}
                         {/* 视频信息悬浮提示 */}

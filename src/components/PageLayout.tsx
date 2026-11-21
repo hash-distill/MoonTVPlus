@@ -1,6 +1,5 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
 import { BackButton } from './BackButton';
@@ -19,14 +18,8 @@ interface PageLayoutProps {
 }
 
 const PageLayout = ({ children, activePath = '/', hideNavigation = false }: PageLayoutProps) => {
-  const router = useRouter();
   const [backgroundImage, setBackgroundImage] = useState('');
   const shouldShowSharedBackground = !hideNavigation && activePath !== '/play';
-
-  useEffect(() => {
-    router.prefetch('/search');
-    router.prefetch('/play');
-  }, [router]);
 
   useEffect(() => {
     if (typeof window === 'undefined' || !shouldShowSharedBackground) {

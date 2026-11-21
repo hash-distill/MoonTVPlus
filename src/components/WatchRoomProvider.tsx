@@ -92,10 +92,11 @@ export const useWatchRoomContextSafe = () => {
 };
 
 interface WatchRoomProviderProps {
+  publicConfig: Pick<WatchRoomConfig, 'enabled' | 'serverType' | 'externalServerUrl'>;
   children: React.ReactNode;
 }
 
-export function WatchRoomProvider({ children }: WatchRoomProviderProps) {
+export function WatchRoomProvider({ children, publicConfig }: WatchRoomProviderProps) {
   const pathname = usePathname();
   const [config, setConfig] = useState<WatchRoomConfig | null>(null);
   const [isEnabled, setIsEnabled] = useState(false);
@@ -213,109 +214,50 @@ export function WatchRoomProvider({ children }: WatchRoomProviderProps) {
     }
   }, [watchRoom]);
 
-  // 加载配置
+  const { connect, disconnect } = watchRoom;
   useEffect(() => {
-    if (shouldDisableWatchRoomConnection === null) {
-      return;
-    }
+    if (shouldDisableWatchRoomConnection === null) return;
 
-    if (shouldDisableWatchRoomConnection) {
-      watchRoom.disconnect();
-      setConfig({
-        enabled: false,
-        serverType: 'internal',
-      });
+    if (shouldDisableWatchRoomConnection || !publicConfig.enabled) {
+      disconnect();
+      setConfig({ ...publicConfig, enabled: false });
       setIsEnabled(false);
       return;
     }
 
+    const controller = new AbortController();
     const loadConfig = async () => {
+      const roomConfig: WatchRoomConfig = { ...publicConfig };
       try {
-        // 使用公共 API 获取观影室配置（不需要管理员权限）
-        const response = await fetch('/api/server-config');
-        if (response.ok) {
-          const data = await response.json();
-          // API 返回格式: { SiteName, StorageType, Version, WatchRoom }
-          const watchRoomConfig: WatchRoomConfig = {
-            enabled: data.WatchRoom?.enabled ?? false, // 默认不启用
-            serverType: data.WatchRoom?.serverType ?? 'internal',
-            externalServerUrl: data.WatchRoom?.externalServerUrl,
-          };
-
-          // 如果使用外部服务器，需要获取认证信息（需要登录）
-          if (watchRoomConfig.serverType === 'external' && watchRoomConfig.enabled) {
-            // 检查用户是否已登录
-            if (!isLoggedIn) {
-              console.log('[WatchRoom] User not logged in, skipping auth info request');
-              // 用户未登录，不调用认证接口
-            } else {
-              try {
-                const authResponse = await fetch('/api/watch-room-auth');
-                if (authResponse.ok) {
-                  const authData = await authResponse.json();
-                  watchRoomConfig.externalServerAuth = authData.externalServerAuth;
-                  // 多应用隔离 ID（未配置时不携带，兼容旧版外部服务器）
-                  watchRoomConfig.externalAppId = authData.externalAppId || undefined;
-                } else {
-                  console.error('[WatchRoom] Failed to load auth info:', authResponse.status);
-                  // 如果无法获取认证信息，禁用观影室
-                  watchRoomConfig.enabled = false;
-                }
-              } catch (error) {
-                console.error('[WatchRoom] Error loading auth info:', error);
-                // 如果无法获取认证信息，禁用观影室
-                watchRoomConfig.enabled = false;
-              }
-            }
-          }
-
-          setConfig(watchRoomConfig);
-          setIsEnabled(watchRoomConfig.enabled);
-
-          // 只在启用了观影室时才连接
-          if (watchRoomConfig.enabled) {
-            console.log('[WatchRoom] Connecting with config:', watchRoomConfig);
-
-            // 设置重连回调
-            const { watchRoomSocketManager } = await import('@/lib/watch-room-socket');
-            watchRoomSocketManager.setReconnectFailedCallback(() => {
-              console.log('[WatchRoomProvider] Reconnect failed callback triggered');
-              setReconnectFailed(true);
-            });
-
-            watchRoomSocketManager.setReconnectSuccessCallback(() => {
-              console.log('[WatchRoomProvider] Reconnect success callback triggered');
-              setReconnectFailed(false);
-            });
-
-            await watchRoom.connect(watchRoomConfig);
-          } else {
-            console.log('[WatchRoom] Watch room is disabled, skipping connection');
-          }
-        } else {
-          console.error('[WatchRoom] Failed to load config:', response.status);
-          // 加载配置失败时，不连接，保持禁用状态
-          const defaultConfig: WatchRoomConfig = {
-            enabled: false,
-            serverType: 'internal',
-          };
-          setConfig(defaultConfig);
-          setIsEnabled(false);
+        if (roomConfig.serverType === 'external' && isLoggedIn) {
+          const response = await fetch('/api/watch-room-auth', {
+            signal: controller.signal,
+          });
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          const auth = await response.json();
+          roomConfig.externalServerAuth = auth.externalServerAuth;
+          roomConfig.externalAppId = auth.externalAppId || undefined;
         }
+
+        const { watchRoomSocketManager } = await import('@/lib/watch-room-socket');
+        if (controller.signal.aborted) return;
+        setConfig(roomConfig);
+        setIsEnabled(true);
+        watchRoomSocketManager.setReconnectFailedCallback(() => setReconnectFailed(true));
+        watchRoomSocketManager.setReconnectSuccessCallback(() => setReconnectFailed(false));
+        await connect(roomConfig);
       } catch (error) {
-        console.error('[WatchRoom] Error loading config:', error);
-        // 加载配置失败时，不连接，保持禁用状态
-        const defaultConfig: WatchRoomConfig = {
-          enabled: false,
-          serverType: 'internal',
-        };
-        setConfig(defaultConfig);
+        if (controller.signal.aborted) return;
+        console.error('[WatchRoom] Could not initialize room connection:', error);
+        disconnect();
+        setConfig({ ...publicConfig, enabled: false });
         setIsEnabled(false);
       }
     };
 
-    loadConfig();
-  }, [isLoggedIn, shouldDisableWatchRoomConnection]); // 添加 isLoggedIn 作为依赖
+    void loadConfig();
+    return () => controller.abort();
+  }, [connect, disconnect, isLoggedIn, publicConfig, shouldDisableWatchRoomConnection]);
 
   // 仅在 Provider 卸载时断开，避免路由切换时误断开房间连接
   useEffect(() => {

@@ -156,7 +156,7 @@ type AnimeImageSource =
 const BANGUMI_IMAGE_FALLBACK_UNTIL_KEY = 'bangumiImageFallbackUntil';
 const BANGUMI_IMAGE_FALLBACK_SIGNATURE_KEY = 'bangumiImageFallbackSignature';
 const BANGUMI_IMAGE_FALLBACK_DURATION = 60 * 60 * 1000;
-/** 探测主源图片域主页超时（404 也算通） */
+/** 探测实际海报地址的超时 */
 const BANGUMI_IMAGE_PROBE_TIMEOUT_MS = 5000;
 /** 探测成功后的内存缓存，避免列表刷屏时重复探测 */
 const BANGUMI_IMAGE_PROBE_OK_TTL_MS = 15 * 60 * 1000;
@@ -261,29 +261,6 @@ function getBangumiImageProbeSignature(): string {
   });
 }
 
-/** 当前主源图片域 origin；server-proxy 无需探测返回 null */
-function getBangumiImageProbeOrigin(): string | null {
-  const primary = getPrimaryBangumiImageSource();
-  switch (primary) {
-    case 'server-proxy':
-      return null;
-    case 'sakura':
-      return 'https://lain.bangumi.lol';
-    case 'custom-baseurl': {
-      const base = getBangumiImageBaseUrl();
-      if (!base) return 'https://lain.bgm.tv';
-      try {
-        return new URL(base).origin;
-      } catch {
-        return null;
-      }
-    }
-    case 'direct':
-    default:
-      return 'https://lain.bgm.tv';
-  }
-}
-
 export function clearBangumiImageProbeCache(): void {
   bangumiImageProbeCache = {
     signature: '',
@@ -318,20 +295,20 @@ export function markBangumiImageFallbackActive(): void {
 }
 
 /**
- * 探测主源图片域是否可达：请求 origin 主页（常见 404），5s 超时 + 防缓存。
+ * 使用当前海报测试主源可达性；非 Bangumi 图片直接跳过。
  * no-cors 下任意完成（含 404）视为可达；超时/DNS/断网视为不可达。
  * 失败时写入 sticky 降级（若有备源）。全局单飞 + 成功缓存 15 分钟。
  * @returns true=主源可用，false=应走备源
  */
-export async function ensureBangumiImagePrimaryProbed(): Promise<boolean> {
-  if (typeof window === 'undefined') return true;
+export async function ensureBangumiImagePrimaryProbed(originalUrl: string): Promise<boolean> {
+  if (typeof window === 'undefined' || !isBangumiImageUrl(originalUrl)) return true;
 
   if (isBangumiImageFallbackActive()) {
     return false;
   }
 
-  const origin = getBangumiImageProbeOrigin();
-  if (!origin) {
+  const primary = getPrimaryBangumiImageSource();
+  if (primary === 'server-proxy') {
     return true;
   }
 
@@ -354,14 +331,11 @@ export async function ensureBangumiImagePrimaryProbed(): Promise<boolean> {
   }
 
   const probePromise = (async (): Promise<boolean> => {
-    const url = `${origin}/?_cb=${Date.now()}_${Math.random()
-      .toString(36)
-      .slice(2, 10)}`;
+    const url = buildBangumiImageUrl(originalUrl, primary);
     try {
       await fetch(url, {
-        method: 'GET',
+        method: 'HEAD',
         mode: 'no-cors',
-        cache: 'no-store',
         credentials: 'omit',
         signal: AbortSignal.timeout(BANGUMI_IMAGE_PROBE_TIMEOUT_MS),
       });
@@ -379,7 +353,6 @@ export async function ensureBangumiImagePrimaryProbed(): Promise<boolean> {
         okUntil: 0,
         inflight: null,
       };
-      const primary = getPrimaryBangumiImageSource();
       if (getBackupBangumiImageSource(primary)) {
         markBangumiImageFallbackActive();
       }
@@ -395,12 +368,6 @@ export async function ensureBangumiImagePrimaryProbed(): Promise<boolean> {
   };
 
   return probePromise;
-}
-
-/** 非阻塞触发主源图片域探测（processImageUrl / 首屏侧调用） */
-export function scheduleBangumiImagePrimaryProbe(): void {
-  if (typeof window === 'undefined') return;
-  void ensureBangumiImagePrimaryProbed();
 }
 
 function normalizeComparableUrl(url: string): string {
@@ -608,7 +575,7 @@ export function processImageUrl(originalUrl: string): string {
       return buildBangumiImageUrl(originalUrl, backup);
     }
     if (primary !== 'server-proxy' && backup) {
-      scheduleBangumiImagePrimaryProbe();
+      void ensureBangumiImagePrimaryProbed(originalUrl);
     }
     return buildBangumiImageUrl(originalUrl, primary);
   }

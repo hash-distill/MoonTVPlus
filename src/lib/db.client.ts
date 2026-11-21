@@ -14,6 +14,7 @@
  * 如后续需要在客户端读取收藏等其它数据，可按同样方式在此文件中补充实现。
  */
 
+import { isPageReadCancelled, pageReadSignal } from '@/lib/page-read.client';
 import { getAuthInfoFromBrowserCookie, clearAuthCookie } from './auth';
 import { normalizeEpisodeFilterConfig } from './episode-filter';
 import { MangaReadRecord, MangaShelfItem } from './manga.types';
@@ -769,7 +770,7 @@ export async function fetchWithAuth(
 }
 
 async function fetchFromApi<T>(path: string): Promise<T> {
-  const res = await fetchWithAuth(path);
+  const res = await fetchWithAuth(path, { signal: pageReadSignal() });
   return (await res.json()) as T;
 }
 
@@ -827,6 +828,7 @@ async function getAllPlayRecordsRaw(): Promise<Record<string, PlayRecord>> {
         cacheManager.cachePlayRecords(freshData);
         return freshData;
       } catch (err) {
+        if (isPageReadCancelled(err)) return {};
         console.error('获取播放记录失败:', err);
         triggerGlobalError('获取播放记录失败');
         return {};
@@ -1302,6 +1304,7 @@ export async function getSearchHistory(): Promise<string[]> {
         cacheManager.cacheSearchHistory(uniqueData);
         return uniqueData;
       } catch (err) {
+        if (isPageReadCancelled(err)) return [];
         console.error('获取搜索历史失败:', err);
         triggerGlobalError('获取搜索历史失败');
         return [];
@@ -1576,6 +1579,7 @@ async function getAllFavoritesRaw(): Promise<Record<string, Favorite>> {
           cacheManager.cacheFavorites(freshData);
           return freshData;
         } catch (err) {
+          if (isPageReadCancelled(err)) return {};
           console.error('获取收藏失败:', err);
           triggerGlobalError('获取收藏失败');
           return {};
@@ -2398,6 +2402,7 @@ export async function getSkipConfig(
         cacheManager.cacheSkipConfigs(freshData);
         return freshData[key] || null;
       } catch (err) {
+        if (isPageReadCancelled(err)) return null;
         console.error('获取跳过片头片尾配置失败:', err);
         triggerGlobalError('获取跳过片头片尾配置失败');
         return null;
@@ -2527,6 +2532,7 @@ export async function getAllSkipConfigs(): Promise<Record<string, SkipConfig>> {
         cacheManager.cacheSkipConfigs(freshData);
         return freshData;
       } catch (err) {
+        if (isPageReadCancelled(err)) return {};
         console.error('获取跳过片头片尾配置失败:', err);
         triggerGlobalError('获取跳过片头片尾配置失败');
         return {};
@@ -2653,6 +2659,7 @@ export async function getDanmakuFilterConfig(): Promise<DanmakuFilterConfig | nu
         cacheManager.cacheDanmakuFilterConfig(freshData);
         return freshData;
       } catch (err) {
+        if (isPageReadCancelled(err)) return null;
         console.error('获取弹幕过滤配置失败:', err);
         return null;
       }

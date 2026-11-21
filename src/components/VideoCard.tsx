@@ -272,7 +272,7 @@ const VideoCard = forwardRef<VideoCardHandle, VideoCardProps>(
 
       let cancelled = false;
       void (async () => {
-        const reachable = await ensureBangumiImagePrimaryProbed();
+        const reachable = await ensureBangumiImagePrimaryProbed(actualPoster);
         if (cancelled || reachable) return;
         const bangumiFallbackPoster = getBangumiImageFallbackUrl(actualPoster);
         if (bangumiFallbackPoster) {

@@ -45,7 +45,7 @@ const ProxyImage: React.FC<ProxyImageProps> = ({
 
     let cancelled = false;
     void (async () => {
-      const reachable = await ensureBangumiImagePrimaryProbed();
+      const reachable = await ensureBangumiImagePrimaryProbed(originalSrc);
       if (cancelled || reachable) return;
       setCurrentSrc(processImageUrl(originalSrc));
     })();

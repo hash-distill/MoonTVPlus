@@ -38,6 +38,7 @@ import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
+import { isPageReadCancelled, pageReadSignal } from '@/lib/page-read.client';
 import { getAuthInfoFromBrowserCookie } from '@/lib/auth';
 import { clearAllDanmakuCache, getDanmakuCacheStats } from '@/lib/danmaku/api';
 import { LIVE_AUTO_SPEED_TEST_KEY, SAVE_LIVE_PLAY_RECORDS_KEY } from '@/lib/db.client';
@@ -404,7 +405,7 @@ export const UserMenu: React.FC = () => {
   // 加载未读通知数量
   const loadUnreadCount = async () => {
     try {
-      const response = await fetch('/api/notifications');
+      const response = await fetch('/api/notifications', { signal: pageReadSignal() });
       if (response.ok) {
         const data = await response.json();
         const count = data.unreadCount || 0;
@@ -415,6 +416,7 @@ export const UserMenu: React.FC = () => {
         }
       }
     } catch (error) {
+      if (isPageReadCancelled(error)) return;
       console.error('加载未读通知数量失败:', error);
     }
   };
@@ -474,6 +476,18 @@ export const UserMenu: React.FC = () => {
       await loadDanmakuCacheUsage();
     })();
   }, [loadDanmakuCacheUsage, mounted, isSettingsOpen, isDanmakuSectionOpen]);
+
+  useEffect(() => {
+    if (!isSettingsOpen || bangumiProxyScript) return;
+    const controller = new AbortController();
+    fetch('/scripts/bangumi-proxy.worker.js', { signal: controller.signal })
+      .then((response) => (response.ok ? response.text() : ''))
+      .then(setBangumiProxyScript)
+      .catch((error) => {
+        if (!controller.signal.aborted) console.error('加载 Bangumi Workers 脚本失败:', error);
+      });
+    return () => controller.abort();
+  }, [isSettingsOpen, bangumiProxyScript]);
 
   // 监听通知更新事件
   useEffect(() => {
@@ -693,13 +707,6 @@ export const UserMenu: React.FC = () => {
 
       const savedAnimeImageBaseUrl = localStorage.getItem('animeImageBaseUrl');
       setAnimeImageBaseUrl(savedAnimeImageBaseUrl || '');
-
-      fetch('/scripts/bangumi-proxy.worker.js')
-        .then((response) => (response.ok ? response.text() : ''))
-        .then(setBangumiProxyScript)
-        .catch((error) => {
-          console.error('加载 Bangumi Workers 脚本失败:', error);
-        });
 
       const savedDoubanImageProxyType = localStorage.getItem(
         'doubanImageProxyType'

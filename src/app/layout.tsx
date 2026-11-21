@@ -10,6 +10,7 @@ import { parseAuthInfo } from '@/lib/auth';
 import { getConfig } from '@/lib/config';
 import { getUserFeatureAccess } from '@/lib/permissions';
 import { listEnabledSourceScripts } from '@/lib/source-script';
+import { getPublicWatchRoomConfig } from '@/lib/watch-room-config.server';
 
 import { StartupCacheCleanup } from '../components/DanmakuCacheCleanup';
 import { DownloadBubble } from '../components/DownloadBubble';
@@ -453,7 +454,7 @@ export default async function RootLayout({
             announcementDisplayMode={announcementDisplayMode}
             tmdbApiKey={tmdbApiKey}
           >
-            <WatchRoomProvider>
+            <WatchRoomProvider publicConfig={getPublicWatchRoomConfig()}>
               <DownloadProvider>
                 <StartupCacheCleanup />
                 {children}
