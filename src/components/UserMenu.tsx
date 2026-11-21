@@ -68,10 +68,17 @@ interface AuthInfo {
   role?: 'owner' | 'admin' | 'user';
 }
 
-export const UserMenu: React.FC = () => {
+export const UserMenu = ({ className }: { className: string }) => {
   const router = useRouter();
   const { updateStatus, isChecking } = useVersionCheck();
   const [isOpen, setIsOpen] = useState(false);
+  const [menuAnchor, setMenuAnchor] = useState({ left: 0, bottom: 0 });
+  useEffect(() => {
+    if (!isOpen) return;
+    const closeOnResize = () => setIsOpen(false);
+    window.addEventListener('resize', closeOnResize);
+    return () => window.removeEventListener('resize', closeOnResize);
+  }, [isOpen]);
   const [isProfileCenterOpen, setIsProfileCenterOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
@@ -1458,7 +1465,9 @@ export const UserMenu: React.FC = () => {
     }
   }, [isCloudBackupDropdownOpen]);
 
-  const handleMenuClick = () => {
+  const handleMenuClick = (event: React.MouseEvent<HTMLButtonElement>) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    setMenuAnchor({ left: rect.left, bottom: window.innerHeight - rect.top + 4 });
     setIsOpen(!isOpen);
   };
 
@@ -2989,7 +2998,10 @@ export const UserMenu: React.FC = () => {
       />
 
       {/* 菜单面板 */}
-      <div className='fixed bottom-[calc(3.5rem+env(safe-area-inset-bottom))] left-[max(0.375rem,env(safe-area-inset-left))] max-h-[calc(100dvh-4rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))] w-56 bg-white dark:bg-gray-900 rounded-lg shadow-xl z-[1001] border border-gray-200/50 dark:border-gray-700/50 overflow-y-auto overscroll-contain select-none'>
+      <div
+        style={{ ...menuAnchor, maxHeight: `calc(100dvh - ${menuAnchor.bottom + 8}px - env(safe-area-inset-top))` }}
+        className='fixed w-56 bg-white dark:bg-gray-900 rounded-lg shadow-xl z-[1001] border border-gray-200/50 dark:border-gray-700/50 overflow-y-auto overscroll-contain select-none'
+      >
         {/* 用户信息区域 */}
         <div className='px-3 py-1 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-gray-50 to-gray-100/50 dark:from-gray-800 dark:to-gray-800/50'>
           <div className='flex items-start justify-between gap-3'>
@@ -6241,12 +6253,13 @@ export const UserMenu: React.FC = () => {
       <div className='relative'>
         <button
           onClick={handleMenuClick}
-          className='w-10 h-10 p-2 rounded-full flex items-center justify-center text-gray-600 hover:bg-gray-200/50 dark:text-gray-300 dark:hover:bg-gray-700/50 transition-colors'
+          className={className}
           aria-label='个人菜单'
           aria-expanded={isOpen}
           title='个人菜单'
         >
-          <User className='w-full h-full' />
+          <User aria-hidden='true' className='h-4 w-4 shrink-0' />
+          <span>个人菜单</span>
         </button>
         {/* 版本更新红点 */}
         {updateStatus === UpdateStatus.HAS_UPDATE && (

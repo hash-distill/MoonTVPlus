@@ -365,7 +365,7 @@ const Sidebar = ({ onToggle, activePath = '/' }: SidebarProps) => {
                 })}
               </div>
             </div>
-            <div className='flex shrink-0 px-1.5 pb-[calc(0.25rem+env(safe-area-inset-bottom))] pt-2'>
+            <div className='shrink-0 border-t border-gray-200 bg-white px-2 pb-[calc(2rem+env(safe-area-inset-bottom))] pt-2 dark:border-gray-700 dark:bg-gray-900'>
               <AccountControls collapsed={isCollapsed} />
             </div>
           </div>

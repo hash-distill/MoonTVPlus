@@ -172,7 +172,7 @@ const MobileBottomNav = ({ activePath }: MobileBottomNavProps) => {
         minHeight: 'calc(3.5rem + env(safe-area-inset-bottom))',
       }}
     >
-      <div className='flex items-center gap-1 pl-[max(0.375rem,env(safe-area-inset-left))]'>
+      <div className='flex items-center gap-1 pb-3 pt-1 pl-[max(0.5rem,env(safe-area-inset-left))]'>
         <AccountControls />
         <ul className='flex min-w-0 flex-1 items-center overflow-x-auto scrollbar-hide'>
           {navItems.map((item) => {

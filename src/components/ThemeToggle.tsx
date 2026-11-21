@@ -7,7 +7,13 @@ import { usePathname } from 'next/navigation';
 import { useTheme } from 'next-themes';
 import { useEffect, useState } from 'react';
 
-export function ThemeToggle() {
+export function ThemeToggle({
+  showLabel = false,
+  className = 'w-10 h-10 p-2 rounded-full flex items-center justify-center text-gray-600 hover:bg-gray-200/50 dark:text-gray-300 dark:hover:bg-gray-700/50 transition-colors',
+}: {
+  showLabel?: boolean;
+  className?: string;
+} = {}) {
   const [mounted, setMounted] = useState(false);
   const { setTheme, resolvedTheme } = useTheme();
   const pathname = usePathname();
@@ -37,7 +43,7 @@ export function ThemeToggle() {
 
   if (!mounted) {
     // 渲染一个占位符以避免布局偏移
-    return <div className='w-10 h-10' />;
+    return <div aria-hidden='true' className={className} />;
   }
 
   const toggleTheme = () => {
@@ -54,18 +60,17 @@ export function ThemeToggle() {
     });
   };
 
+  const Icon = resolvedTheme === 'dark' ? Sun : Moon;
+
   return (
     <button
       onClick={toggleTheme}
-      className='w-10 h-10 p-2 rounded-full flex items-center justify-center text-gray-600 hover:bg-gray-200/50 dark:text-gray-300 dark:hover:bg-gray-700/50 transition-colors'
+      className={className}
       aria-label='切换主题'
       title='切换主题'
     >
-      {resolvedTheme === 'dark' ? (
-        <Sun className='w-full h-full' />
-      ) : (
-        <Moon className='w-full h-full' />
-      )}
+      <Icon aria-hidden='true' className={showLabel ? 'h-4 w-4 shrink-0' : 'h-full w-full'} />
+      {showLabel && <span>切换主题</span>}
     </button>
   );
 }

@@ -139,7 +139,7 @@ export default function MediaShell({
           'mx-auto max-w-7xl',
           reader
             ? reader.mainClassName
-            : 'px-3 pb-[calc(5rem+env(safe-area-inset-bottom))] pt-[calc(5rem+var(--safe-top))] sm:px-6 sm:pt-[calc(6rem+var(--safe-top))] lg:pb-10'
+            : 'px-3 pb-[calc(7rem+env(safe-area-inset-bottom))] pt-[calc(5rem+var(--safe-top))] sm:px-6 sm:pt-[calc(6rem+var(--safe-top))] lg:pb-10'
         )}
       >
         {children}
@@ -147,10 +147,10 @@ export default function MediaShell({
 
       {!isReader && (
         <div
-          className='fixed inset-x-0 bottom-0 z-40 flex items-end gap-1 border-t border-library-edge bg-library-paper pl-[max(0.375rem,env(safe-area-inset-left))] dark:border-library-night-edge dark:bg-library-night lg:right-auto lg:border-0 lg:bg-transparent lg:dark:bg-transparent'
+          className='fixed inset-x-0 bottom-0 z-40 flex items-center gap-1 border-t border-library-edge bg-library-paper pl-[max(0.375rem,env(safe-area-inset-left))] dark:border-library-night-edge dark:bg-library-night lg:right-auto lg:border-0 lg:bg-transparent lg:dark:bg-transparent'
           style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
         >
-          <div className='mb-1'>
+          <div className='mb-3 mt-1 bg-library-paper dark:bg-library-night lg:mb-8 lg:rounded-lg'>
             <AccountControls />
           </div>
           <nav className='mx-auto grid min-w-0 max-w-3xl flex-1 grid-cols-4 lg:hidden'>
