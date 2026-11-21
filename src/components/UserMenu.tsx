@@ -2989,7 +2989,7 @@ export const UserMenu: React.FC = () => {
       />
 
       {/* 菜单面板 */}
-      <div className='fixed top-14 right-4 w-56 bg-white dark:bg-gray-900 rounded-lg shadow-xl z-[1001] border border-gray-200/50 dark:border-gray-700/50 overflow-hidden select-none'>
+      <div className='fixed bottom-[calc(3.5rem+env(safe-area-inset-bottom))] left-[max(0.375rem,env(safe-area-inset-left))] max-h-[calc(100dvh-4rem-env(safe-area-inset-top)-env(safe-area-inset-bottom))] w-56 bg-white dark:bg-gray-900 rounded-lg shadow-xl z-[1001] border border-gray-200/50 dark:border-gray-700/50 overflow-y-auto overscroll-contain select-none'>
         {/* 用户信息区域 */}
         <div className='px-3 py-1 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-gray-50 to-gray-100/50 dark:from-gray-800 dark:to-gray-800/50'>
           <div className='flex items-start justify-between gap-3'>
@@ -6242,7 +6242,9 @@ export const UserMenu: React.FC = () => {
         <button
           onClick={handleMenuClick}
           className='w-10 h-10 p-2 rounded-full flex items-center justify-center text-gray-600 hover:bg-gray-200/50 dark:text-gray-300 dark:hover:bg-gray-700/50 transition-colors'
-          aria-label='User Menu'
+          aria-label='个人菜单'
+          aria-expanded={isOpen}
+          title='个人菜单'
         >
           <User className='w-full h-full' />
         </button>

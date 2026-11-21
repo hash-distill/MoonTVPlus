@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 
 import { cn } from '@/lib/cn';
 
+import AccountControls from '@/components/AccountControls';
 import {
   LIBRARY_FOCUS,
   LIBRARY_ICON_BUTTON_GHOST,
@@ -16,9 +17,6 @@ import {
   SPINE_TAB_ACTIVE,
   SPINE_TAB_IDLE,
 } from '@/components/media/library';
-import { ThemeToggle } from '@/components/ThemeToggle';
-import { UpdateNotification } from '@/components/UpdateNotification';
-import { UserMenu } from '@/components/UserMenu';
 
 export interface MediaShellTab {
   href: string;
@@ -111,34 +109,27 @@ export default function MediaShell({
               {reader?.actions}
             </div>
           ) : (
-            <>
-              <nav className='ml-auto hidden items-center gap-1 lg:flex'>
-                {tabs.map((tab) => {
-                  const Icon = tab.icon;
-                  const active = isActive(tab.href);
-                  return (
-                    <Link
-                      key={tab.href}
-                      href={tab.href}
-                      aria-current={active ? 'page' : undefined}
-                      className={cn(
-                        'inline-flex items-center gap-2 rounded-md px-4 py-2 text-sm transition-colors duration-200',
-                        LIBRARY_FOCUS,
-                        active ? SPINE_TAB_ACTIVE : SPINE_TAB_IDLE
-                      )}
-                    >
-                      <Icon className='h-4 w-4' />
-                      {tab.label}
-                    </Link>
-                  );
-                })}
-              </nav>
-              <div className='ml-auto hidden shrink-0 items-center gap-2 md:flex lg:ml-0'>
-                <ThemeToggle />
-                <UserMenu />
-                <UpdateNotification />
-              </div>
-            </>
+            <nav className='ml-auto hidden items-center gap-1 lg:flex'>
+              {tabs.map((tab) => {
+                const Icon = tab.icon;
+                const active = isActive(tab.href);
+                return (
+                  <Link
+                    key={tab.href}
+                    href={tab.href}
+                    aria-current={active ? 'page' : undefined}
+                    className={cn(
+                      'inline-flex items-center gap-2 rounded-md px-4 py-2 text-sm transition-colors duration-200',
+                      LIBRARY_FOCUS,
+                      active ? SPINE_TAB_ACTIVE : SPINE_TAB_IDLE
+                    )}
+                  >
+                    <Icon className='h-4 w-4' />
+                    {tab.label}
+                  </Link>
+                );
+              })}
+            </nav>
           )}
         </div>
       </header>
@@ -155,11 +146,14 @@ export default function MediaShell({
       </main>
 
       {!isReader && (
-        <nav
-          className='fixed inset-x-0 bottom-0 z-40 border-t border-library-edge bg-library-paper/95 backdrop-blur-none dark:border-library-night-edge dark:bg-library-night/95 lg:hidden'
+        <div
+          className='fixed inset-x-0 bottom-0 z-40 flex items-end gap-1 border-t border-library-edge bg-library-paper pl-[max(0.375rem,env(safe-area-inset-left))] dark:border-library-night-edge dark:bg-library-night lg:right-auto lg:border-0 lg:bg-transparent lg:dark:bg-transparent'
           style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
         >
-          <div className='mx-auto grid max-w-3xl grid-cols-4'>
+          <div className='mb-1'>
+            <AccountControls />
+          </div>
+          <nav className='mx-auto grid min-w-0 max-w-3xl flex-1 grid-cols-4 lg:hidden'>
             {tabs.map((tab) => {
               const Icon = tab.icon;
               const active = isActive(tab.href);
@@ -190,8 +184,8 @@ export default function MediaShell({
                 </Link>
               );
             })}
-          </div>
-        </nav>
+          </nav>
+        </div>
       )}
     </div>
   );

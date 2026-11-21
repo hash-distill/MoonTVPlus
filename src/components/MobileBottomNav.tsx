@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
+import AccountControls from './AccountControls';
 import { useWatchRoomContextSafe } from './WatchRoomProvider';
 
 interface MobileBottomNavProps {
@@ -171,40 +172,43 @@ const MobileBottomNav = ({ activePath }: MobileBottomNavProps) => {
         minHeight: 'calc(3.5rem + env(safe-area-inset-bottom))',
       }}
     >
-      <ul className='flex items-center overflow-x-auto scrollbar-hide'>
-        {navItems.map((item) => {
-          const active = isActive(item.href);
-          return (
-            <li
-              key={item.href}
-              className='flex-shrink-0'
-              style={{ width: '20vw', minWidth: '20vw' }}
-            >
-              <Link
-                href={item.href}
-                prefetch={false}
-                className='flex flex-col items-center justify-center w-full h-14 gap-1 text-xs'
+      <div className='flex items-center gap-1 pl-[max(0.375rem,env(safe-area-inset-left))]'>
+        <AccountControls />
+        <ul className='flex min-w-0 flex-1 items-center overflow-x-auto scrollbar-hide'>
+          {navItems.map((item) => {
+            const active = isActive(item.href);
+            return (
+              <li
+                key={item.href}
+                className='flex-shrink-0'
+                style={{ width: '20vw', minWidth: '20vw' }}
               >
-                <item.icon
-                  className={`h-6 w-6 ${active
-                    ? 'text-green-600 dark:text-green-400'
-                    : 'text-gray-500 dark:text-gray-400'
-                    }`}
-                />
-                <span
-                  className={
-                    active
-                      ? 'text-green-600 dark:text-green-400'
-                      : 'text-gray-600 dark:text-gray-300'
-                  }
+                <Link
+                  href={item.href}
+                  prefetch={false}
+                  className='flex flex-col items-center justify-center w-full h-14 gap-1 text-xs'
                 >
-                  {item.label}
-                </span>
-              </Link>
-            </li>
-          );
-        })}
-      </ul>
+                  <item.icon
+                    className={`h-6 w-6 ${active
+                      ? 'text-green-600 dark:text-green-400'
+                      : 'text-gray-500 dark:text-gray-400'
+                      }`}
+                  />
+                  <span
+                    className={
+                      active
+                        ? 'text-green-600 dark:text-green-400'
+                        : 'text-gray-600 dark:text-gray-300'
+                    }
+                  >
+                    {item.label}
+                  </span>
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
     </nav>
   );
 };

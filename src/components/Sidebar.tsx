@@ -16,6 +16,7 @@ import {
 
 import { SPECIAL_SOURCE_PATH } from '@/lib/special-source.client';
 
+import AccountControls from './AccountControls';
 import { useSite } from './SiteProvider';
 import { useWatchRoomContextSafe } from './WatchRoomProvider';
 
@@ -363,6 +364,9 @@ const Sidebar = ({ onToggle, activePath = '/' }: SidebarProps) => {
                   );
                 })}
               </div>
+            </div>
+            <div className='flex shrink-0 px-1.5 pb-[calc(0.25rem+env(safe-area-inset-bottom))] pt-2'>
+              <AccountControls collapsed={isCollapsed} />
             </div>
           </div>
         </aside>
