@@ -167,7 +167,7 @@ export function SearchPageClient({ searchBase = '/search' }: { searchBase?: stri
       if (!cached) return null;
 
       const parsed = JSON.parse(cached) as SearchCachePayload;
-      if (parsed?.status === 'complete' && Array.isArray(parsed.results) && parsed.results.length > 0) {
+      if (parsed?.status === 'complete' && Array.isArray(parsed.results) && parsed.results.length > 0 && (!/^[\x20-\x7e]+$/.test(query) || parsed.results.some(item => item.matchedAlias || item.title.toLowerCase().includes(query.toLowerCase())))) {
         return parsed.results;
       }
     } catch (error) {
@@ -437,7 +437,7 @@ export function SearchPageClient({ searchBase = '/search' }: { searchBase?: stri
     if (!exactSearch) return searchResults;
 
     return searchResults.filter((item) =>
-      titleContainsQuery(item.title, submittedSearchQuery)
+      titleContainsQuery(item.title, item.matchedAlias || submittedSearchQuery)
     );
   }, [searchResults, submittedSearchQuery, exactSearch]);
 
@@ -908,7 +908,7 @@ export function SearchPageClient({ searchBase = '/search' }: { searchBase?: stri
   );
 
   const renderListItem = (item: {
-    qualitySource: SearchResult;
+    qualitySources: SearchResult[];
     key: string;
     title: string;
     poster: string;
@@ -989,7 +989,7 @@ export function SearchPageClient({ searchBase = '/search' }: { searchBase?: stri
                     item.type === 'movie' ? '电影' : '剧集',
                     'bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-300'
                   )}
-                  <SearchQuality source={item.qualitySource} />
+                  <SearchQuality sources={item.qualitySources} />
                   {yearText &&
                     renderTag(
                       yearText,
@@ -2331,7 +2331,7 @@ export function SearchPageClient({ searchBase = '/search' }: { searchBase?: stri
 
                               if (resultDisplayMode === 'list') {
                                 return renderListItem({
-                                  qualitySource: group[0],
+                                  qualitySources: group,
                                   key: `agg-${mapKey}`,
                                   title,
                                   poster,
@@ -2380,7 +2380,7 @@ export function SearchPageClient({ searchBase = '/search' }: { searchBase?: stri
                                       group.find((g) => g.class)?.class
                                     }
                                   />
-                                  <SearchQuality source={group[0]} />
+                                  <SearchQuality sources={group} />
                                 </div>
                               );
                             })
@@ -2394,7 +2394,7 @@ export function SearchPageClient({ searchBase = '/search' }: { searchBase?: stri
 
                               if (resultDisplayMode === 'list') {
                                 return renderListItem({
-                                  qualitySource: item,
+                                  qualitySources: [item],
                                   key: `all-${item.source}-${item.id}`,
                                   id: item.id,
                                   title: item.title,
@@ -2441,7 +2441,7 @@ export function SearchPageClient({ searchBase = '/search' }: { searchBase?: stri
                                     isAnime={itemIsAnime}
                                     typeName={item.type_name || item.class}
                                   />
-                                  <SearchQuality source={item} />
+                                  <SearchQuality sources={[item]} />
                                 </div>
                               );
                             });

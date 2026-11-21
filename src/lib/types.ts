@@ -313,6 +313,7 @@ export interface SetLocalSettingsSyncResult {
 
 // 搜索结果数据结构
 export interface SearchResult {
+  matchedAlias?: string;
   id: string;
   title: string;
   poster: string;

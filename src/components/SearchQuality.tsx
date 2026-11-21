@@ -39,23 +39,43 @@ async function readQuality(url: string) {
   return task;
 }
 
-export default function SearchQuality({ source }: { source: SearchResult }) {
+type Source = Pick<SearchResult, 'episodes' | 'proxyMode' | 'source' | 'source_name'>;
+
+export default function SearchQuality({ sources }: { sources: Source[] }) {
   const ref = useRef<HTMLSpanElement>(null);
-  const [result, setResult] = useState({ url: '', label: '' });
-  const raw = source.episodes?.[0] || '';
-  const url = /^https?:\/\//i.test(raw) && /\.m3u8(?:[?#]|$)/i.test(raw)
-    ? source.proxyMode ? '/api/proxy/vod/m3u8?source=' + encodeURIComponent(source.source) + '&url=' + encodeURIComponent(raw) : raw
-    : '';
+  const [result, setResult] = useState({ key: '', text: '' });
+  // 稳定的值标识避免搜索结果分批刷新时重启相同的探测。
+  const key = JSON.stringify(sources.map(source => {
+    const raw = source.episodes?.[0] || '';
+    const url = /^https?:\/\//i.test(raw) && /\.m3u8(?:[?#]|$)/i.test(raw)
+      ? source.proxyMode ? '/api/proxy/vod/m3u8?source=' + encodeURIComponent(source.source) + '&url=' + encodeURIComponent(raw) : raw
+      : '';
+    return [source.source_name, url];
+  }));
   useEffect(() => {
-    if (!url || !ref.current) return;
+    if (!ref.current) return;
     let mounted = true;
+    const inspect = async () => {
+      const entries: [string, string][] = JSON.parse(key);
+      for (const [name, url] of entries) {
+        if (!mounted) return;
+        if (!url) continue;
+        const label = await readQuality(url);
+        if (!mounted) return;
+        if (label !== '画质未知') {
+          setResult({ key, text: name + ' · ' + label });
+          return;
+        }
+      }
+      if (mounted) setResult({ key, text: '画质未知' });
+    };
     const observer = new IntersectionObserver(entries => {
       if (!entries.some(e => e.isIntersecting)) return;
       observer.disconnect();
-      readQuality(url).then(label => { if (mounted) setResult({ url, label }); });
+      void inspect();
     });
     observer.observe(ref.current);
     return () => { mounted = false; observer.disconnect(); };
-  }, [url]);
-  return <span ref={ref} className='text-xs text-gray-500 dark:text-gray-400' title={source.source_name + ' · 首集播放清单最高标称分辨率'}>{source.source_name} · {url && result.url === url ? result.label : url ? '检测画质中' : '画质未知'}</span>;
+  }, [key]);
+  return <span ref={ref} className='text-xs text-gray-500 dark:text-gray-400' title='首集播放清单最高标称分辨率'>{result.key === key ? result.text : '检测画质中'}</span>;
 }

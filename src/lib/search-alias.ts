@@ -24,7 +24,7 @@ export async function searchChineseAlias(query: string, sites: ApiSite[], config
     for (const alias of Array.from(aliases)) {
       for (const result of await searchFromApi(site, alias)) {
         if (DisableYellowFilter || !yellowWords.some(word => result.type_name?.includes(word))) {
-          found.set(result.id, { ...result, weight: config.SourceConfig.find(entry => entry.key === site.key)?.weight ?? 0 });
+          found.set(result.id, { ...result, matchedAlias: alias, weight: config.SourceConfig.find(entry => entry.key === site.key)?.weight ?? 0 });
         }
       }
     }
